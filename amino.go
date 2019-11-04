@@ -2,48 +2,35 @@ package amino
 
 import (
 	"io"
+	aminoOrig "github.com/tendermint/go-amino/go-amino"
 )
 
-type ConcreteOptions struct {
-}
-
-type InterfaceOptions struct {
-	Priority           []string // Disamb priority.
-	AlwaysDisambiguate bool     // If true, include disamb for all types.
-}
-
-type Typ3 uint8
-
-const Typ3_ByteLength = Typ3(2)
+const Typ3_ByteLength = aminoOrig.Typ3_ByteLength
 
 type CodecIfc interface {
 	MarshalBinaryBare(o interface{}) ([]byte, error)
 	MarshalBinaryLengthPrefixed(o interface{}) ([]byte, error)
 	MarshalBinaryLengthPrefixedWriter(w io.Writer, o interface{}) (n int64, err error)
-	MarshalJSON(o interface{}) ([]byte, error)
-	MarshalJSONIndent(o interface{}, prefix, indent string) ([]byte, error)
 	MustMarshalBinaryBare(o interface{}) []byte
 	MustMarshalBinaryLengthPrefixed(o interface{}) []byte
-	MustMarshalJSON(o interface{}) []byte
 	MustUnmarshalBinaryBare(bz []byte, ptr interface{})
 	MustUnmarshalBinaryLengthPrefixed(bz []byte, ptr interface{})
-	MustUnmarshalJSON(bz []byte, ptr interface{})
 	PrintTypes(out io.Writer) error
-	RegisterConcrete(o interface{}, name string, copts *ConcreteOptions)
-	RegisterInterface(ptr interface{}, iopts *InterfaceOptions)
-	Seal() *Codec
+	RegisterConcrete(o interface{}, name string, copts *aminoOrig.ConcreteOptions)
+	RegisterInterface(ptr interface{}, iopts *aminoOrig.InterfaceOptions)
+	SealImp() CodecIfc
 	UnmarshalBinaryBare(bz []byte, ptr interface{}) error
 	UnmarshalBinaryLengthPrefixed(bz []byte, ptr interface{}) error
 	UnmarshalBinaryLengthPrefixedReader(r io.Reader, ptr interface{}, maxSize int64) (n int64, err error)
-	UnmarshalJSON(bz []byte, ptr interface{}) error
 }
 
 type Codec struct {
-	impl CodecIfc
+	imp CodecIfc
+	cdc *aminoOrig.Codec
 }
 
 type StubIfc interface {
-	NewCodec() *Codec
+	NewCodecImp() CodecIfc
 	DeepCopy(o interface{}) (r interface{})
 	MarshalBinaryBare(o interface{}) ([]byte, error)
 	MustMarshalBinaryLengthPrefixed(o interface{}) []byte
@@ -90,66 +77,71 @@ var Stub StubIfc
 /////////////////////////////
 
 func NewCodec() *Codec {
-	return Stub.NewCodec()
+	return &Codec{
+		imp: Stub.NewCodecImp(),
+		cdc: aminoOrig.NewCodec(),
+	}
 }
 
 func (cdc *Codec) MarshalBinaryBare(o interface{}) ([]byte, error) {
-	return cdc.impl.MarshalBinaryBare(o)
+	return cdc.imp.MarshalBinaryBare(o)
 }
 func (cdc *Codec) MarshalBinaryLengthPrefixed(o interface{}) ([]byte, error) {
-	return cdc.impl.MarshalBinaryLengthPrefixed(o)
+	return cdc.imp.MarshalBinaryLengthPrefixed(o)
 }
 func (cdc *Codec) MarshalBinaryLengthPrefixedWriter(w io.Writer, o interface{}) (n int64, err error) {
-	return cdc.impl.MarshalBinaryLengthPrefixedWriter(w, o)
+	return cdc.imp.MarshalBinaryLengthPrefixedWriter(w, o)
 }
 func (cdc *Codec) MarshalJSON(o interface{}) ([]byte, error) {
-	return cdc.impl.MarshalJSON(o)
+	return cdc.cdc.MarshalJSON(o)
 }
 func (cdc *Codec) MarshalJSONIndent(o interface{}, prefix, indent string) ([]byte, error) {
-	return cdc.impl.MarshalJSONIndent(o, prefix, indent)
+	return cdc.cdc.MarshalJSONIndent(o, prefix, indent)
 }
 func (cdc *Codec) MustMarshalBinaryBare(o interface{}) []byte {
-	return cdc.impl.MustMarshalBinaryBare(o)
+	return cdc.imp.MustMarshalBinaryBare(o)
 }
 func (cdc *Codec) MustMarshalBinaryLengthPrefixed(o interface{}) []byte {
-	return cdc.impl.MustMarshalBinaryLengthPrefixed(o)
+	return cdc.imp.MustMarshalBinaryLengthPrefixed(o)
 }
 func (cdc *Codec) MustMarshalJSON(o interface{}) []byte {
-	return cdc.impl.MustMarshalJSON(o)
+	return cdc.cdc.MustMarshalJSON(o)
 }
 func (cdc *Codec) MustUnmarshalBinaryBare(bz []byte, ptr interface{}) {
-	cdc.impl.MustUnmarshalBinaryBare(bz, ptr)
+	cdc.imp.MustUnmarshalBinaryBare(bz, ptr)
 }
 func (cdc *Codec) MustUnmarshalBinaryLengthPrefixed(bz []byte, ptr interface{}) {
-	cdc.impl.MustUnmarshalBinaryLengthPrefixed(bz, ptr)
+	cdc.imp.MustUnmarshalBinaryLengthPrefixed(bz, ptr)
 }
 func (cdc *Codec) MustUnmarshalJSON(bz []byte, ptr interface{}) {
-	cdc.impl.MustUnmarshalJSON(bz, ptr)
+	cdc.cdc.MustUnmarshalJSON(bz, ptr)
 }
 func (cdc *Codec) PrintTypes(out io.Writer) error {
-	return cdc.impl.PrintTypes(out)
+	return cdc.imp.PrintTypes(out)
 }
-func (cdc *Codec) RegisterConcrete(o interface{}, name string, copts *ConcreteOptions) {
-	cdc.impl.RegisterConcrete(o, name, copts)
+func (cdc *Codec) RegisterConcrete(o interface{}, name string, copts *aminoOrig.ConcreteOptions) {
+	cdc.imp.RegisterConcrete(o, name, copts)
+	cdc.cdc.RegisterConcrete(o, name, copts)
 }
-func (cdc *Codec) RegisterInterface(ptr interface{}, iopts *InterfaceOptions) {
-	cdc.impl.RegisterInterface(ptr, iopts)
+func (cdc *Codec) RegisterInterface(ptr interface{}, iopts *aminoOrig.InterfaceOptions) {
+	cdc.imp.RegisterInterface(ptr, iopts)
+	cdc.cdc.RegisterInterface(ptr, iopts)
 }
 func (cdc *Codec) Seal() *Codec {
-	cdc.impl = cdc.impl.Seal()
+	cdc.imp = cdc.imp.SealImp()
 	return cdc
 }
 func (cdc *Codec) UnmarshalBinaryBare(bz []byte, ptr interface{}) error {
-	return cdc.impl.UnmarshalBinaryBare(bz, ptr)
+	return cdc.imp.UnmarshalBinaryBare(bz, ptr)
 }
 func (cdc *Codec) UnmarshalBinaryLengthPrefixed(bz []byte, ptr interface{}) error {
-	return cdc.impl.UnmarshalBinaryLengthPrefixed(bz, ptr)
+	return cdc.imp.UnmarshalBinaryLengthPrefixed(bz, ptr)
 }
 func (cdc *Codec) UnmarshalBinaryLengthPrefixedReader(r io.Reader, ptr interface{}, maxSize int64) (n int64, err error) {
-	return cdc.impl.UnmarshalBinaryLengthPrefixedReader(r, ptr, maxSize)
+	return cdc.imp.UnmarshalBinaryLengthPrefixedReader(r, ptr, maxSize)
 }
 func (cdc *Codec) UnmarshalJSON(bz []byte, ptr interface{}) error {
-	return cdc.impl.UnmarshalJSON(bz, ptr)
+	return cdc.cdc.UnmarshalJSON(bz, ptr)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
